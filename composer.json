@@ -1,0 +1,44 @@
+{
+    "name": "andryzulfikar/file-picker",
+    "description": "Native document/file picker plugin for NativePHP Mobile v4",
+    "type": "nativephp-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Andry Zulfikar",
+            "email": "entoknakal@yahoo.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "nativephp/mobile": "^4.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Andryzulfikar\\FilePicker\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Andryzulfikar\\FilePicker\\FilePickerServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    },
+    "require-dev": {
+        "pestphp/pest": "^3.0"
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

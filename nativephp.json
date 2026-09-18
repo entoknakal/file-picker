@@ -1,0 +1,67 @@
+{
+    "name": "andryzulfikar/file-picker",
+    "version": "1.0.0",
+    "description": "FilePicker plugin for Android only",
+    "namespace": "FilePicker",
+    "keywords": [],
+    "category": "utilities",
+    "license": "MIT",
+    "pricing": {
+        "type": "free"
+    },
+    "author": {
+        "name": "Your Name",
+        "email": "you@example.com",
+        "url": ""
+    },
+    "homepage": "",
+    "repository": "",
+    "funding": [],
+    "platforms": [
+        "android",
+        "ios"
+    ],
+    "icon": "resources/icon.png",
+    "screenshots": [],
+    "bridge_functions": [
+        {
+            "name": "FilePicker.OpenPicker",
+            "android": "com.andryzulfikar.plugins.file_picker.FilePickerFunctions.OpenPicker",
+            "ios": "FilePickerFunctions.openPicker",
+            "description": "openPicker the plugin functionality"
+        }
+    ],
+    "android": {
+        "min_version": 31,
+        "permissions": [],
+        "repositories": [],
+        "dependencies": {
+            "implementation": []
+        },
+        "activities": [],
+        "services": [],
+        "receivers": [],
+        "providers": []
+    },
+    "ios": {
+        "min_version": "15.0",
+        "permissions": [],
+        "repositories": [],
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+    "assets": {
+        "android": [],
+        "ios": []
+    },
+    "secrets": [],
+    "events": [
+        "Andryzulfikar\\FilePicker\\Events\\FilePickerCompleted"
+    ],
+    "service_provider": "Andryzulfikar\\FilePicker\\FilePickerServiceProvider",
+    "hooks": {
+        "copy_assets": "nativephp:file-picker:copy-assets"
+    }
+}
