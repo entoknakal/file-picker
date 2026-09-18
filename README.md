@@ -5,7 +5,7 @@ FilePicker plugin for Android only
 ## Installation
 1. Install file-picker
 ```bash
-composer require andryzulfikar/file-picker
+composer require entoknakal/file-picker
 ```
 2. Ensure you have published the NativeServiceProvider:
 ```bash
@@ -13,7 +13,7 @@ php artisan vendor:publish --tag=nativephp-plugins-provider
 ```
 3. Register the plugin 
 ```bash
-php artisan native:plugin:register andryzulfikar/file-picker
+php artisan native:plugin:register entoknakal/file-picker
 ```
 4. Check that NativePHP sees the plugin
 ```bash
@@ -23,7 +23,7 @@ php artisan native:plugin:list
 ## Usage
 
 ```php
-use Andryzulfikar\FilePicker\Facades\FilePicker;
+use entoknakal\FilePicker\Facades\FilePicker;
 
 // Execute functionality
 $files = FilePicker::open([

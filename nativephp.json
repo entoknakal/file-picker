@@ -1,5 +1,5 @@
 {
-    "name": "andryzulfikar/file-picker",
+    "name": "entoknakal/file-picker",
     "version": "1.0.0",
     "description": "FilePicker plugin for Android only",
     "namespace": "FilePicker",
@@ -26,7 +26,7 @@
     "bridge_functions": [
         {
             "name": "FilePicker.OpenPicker",
-            "android": "com.andryzulfikar.plugins.file_picker.FilePickerFunctions.OpenPicker",
+            "android": "com.entoknakal.plugins.file_picker.FilePickerFunctions.OpenPicker",
             "ios": "FilePickerFunctions.openPicker",
             "description": "openPicker the plugin functionality"
         }
@@ -58,9 +58,9 @@
     },
     "secrets": [],
     "events": [
-        "Andryzulfikar\\FilePicker\\Events\\FilePickerCompleted"
+        "entoknakal\\FilePicker\\Events\\FilePickerCompleted"
     ],
-    "service_provider": "Andryzulfikar\\FilePicker\\FilePickerServiceProvider",
+    "service_provider": "entoknakal\\FilePicker\\FilePickerServiceProvider",
     "hooks": {
         "copy_assets": "nativephp:file-picker:copy-assets"
     }

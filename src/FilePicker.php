@@ -1,6 +1,6 @@
 <?php
 
-namespace Andryzulfikar\FilePicker;
+namespace entoknakal\FilePicker;
 
 
 class FilePicker

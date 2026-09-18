@@ -1,6 +1,6 @@
 <?php
 
-namespace Andryzulfikar\FilePicker\Commands;
+namespace entoknakal\FilePicker\Commands;
 
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
 

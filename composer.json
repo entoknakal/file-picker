@@ -1,5 +1,5 @@
 {
-    "name": "andryzulfikar/file-picker",
+    "name": "entoknakal/file-picker",
     "description": "Native document/file picker plugin for NativePHP Mobile v4",
     "type": "nativephp-plugin",
     "license": "MIT",
@@ -15,13 +15,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Andryzulfikar\\FilePicker\\": "src/"
+            "entoknakal\\FilePicker\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Andryzulfikar\\FilePicker\\FilePickerServiceProvider"
+                "entoknakal\\FilePicker\\FilePickerServiceProvider"
             ]
         },
         "nativephp": {

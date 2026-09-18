@@ -25,7 +25,7 @@ describe('Plugin Manifest', function () {
         $manifest = json_decode(file_get_contents($this->manifestPath), true);
 
         expect($manifest)->toHaveKeys(['name', 'namespace', 'bridge_functions']);
-        expect($manifest['name'])->toBe('andryzulfikar/file-picker');
+        expect($manifest['name'])->toBe('entoknakal/file-picker');
         expect($manifest['namespace'])->toBe('FilePicker');
     });
 
@@ -68,7 +68,7 @@ describe('Native Code', function () {
         expect(file_exists($kotlinFile))->toBeTrue();
 
         $content = file_get_contents($kotlinFile);
-        expect($content)->toContain('package com.andryzulfikar.plugins.file_picker');
+        expect($content)->toContain('package com.entoknakal.plugins.file_picker');
         expect($content)->toContain('object FilePickerFunctions');
         expect($content)->toContain('BridgeFunction');
     });
@@ -115,7 +115,7 @@ describe('PHP Classes', function () {
         expect(file_exists($file))->toBeTrue();
 
         $content = file_get_contents($file);
-        expect($content)->toContain('namespace Andryzulfikar\FilePicker');
+        expect($content)->toContain('namespace entoknakal\FilePicker');
         expect($content)->toContain('class FilePickerServiceProvider');
     });
 
@@ -124,7 +124,7 @@ describe('PHP Classes', function () {
         expect(file_exists($file))->toBeTrue();
 
         $content = file_get_contents($file);
-        expect($content)->toContain('namespace Andryzulfikar\FilePicker\Facades');
+        expect($content)->toContain('namespace entoknakal\FilePicker\Facades');
         expect($content)->toContain('class FilePicker extends Facade');
     });
 
@@ -133,7 +133,7 @@ describe('PHP Classes', function () {
         expect(file_exists($file))->toBeTrue();
 
         $content = file_get_contents($file);
-        expect($content)->toContain('namespace Andryzulfikar\FilePicker');
+        expect($content)->toContain('namespace entoknakal\FilePicker');
         expect($content)->toContain('class FilePicker');
     });
 });

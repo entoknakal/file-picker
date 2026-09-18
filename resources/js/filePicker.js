@@ -2,7 +2,7 @@
  * FilePicker Plugin for NativePHP Mobile
  *
  * @example
- * import { filePicker } from '@andryzulfikar/file-picker';
+ * import { filePicker } from '@entoknakal/file-picker';
  *
  * // Execute functionality
  * const result = await filePicker.execute({ option1: 'value' });

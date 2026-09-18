@@ -1,11 +1,11 @@
 <?php
 
-namespace Andryzulfikar\FilePicker;
+namespace entoknakal\FilePicker;
 
 use Illuminate\Support\ServiceProvider;
-use Andryzulfikar\FilePicker\Commands\CopyAssetsCommand;
-use Andryzulfikar\FilePicker\Events\FilePickerCopy;
-use Andryzulfikar\FilePicker\Listeners\CopyPickedFileListener;
+use entoknakal\FilePicker\Commands\CopyAssetsCommand;
+use entoknakal\FilePicker\Events\FilePickerCopy;
+use entoknakal\FilePicker\Listeners\CopyPickedFileListener;
 use Illuminate\Support\Facades\Event;
 
 class FilePickerServiceProvider extends ServiceProvider
