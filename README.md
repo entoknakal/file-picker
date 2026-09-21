@@ -260,7 +260,7 @@ The following table outlines how built-in string values are normalized and trans
 
 ## Donate
 "If this plugin helped you, consider supporting..."
-<a href="https://buymeacoffee.com"><img src="https://buymeacoffee.com me a coffee&emoji=☕&slug=entoknakal&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
+<a href="https://buymeacoffee.com/entoknakal"><img src="https://buymeacoffee.com me a coffee&emoji=☕&slug=entoknakal&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
 
 
 ## License
