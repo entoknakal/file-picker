@@ -258,11 +258,11 @@ The following table outlines how built-in string values are normalized and trans
 
 *Note: If a custom standalone extension or unrecognized MIME string is processed and cannot be resolved by the device's standard `MimeTypeMap` registry, the Kotlin backend gracefully defaults to `application/octet-stream` or `application/$ext` to prevent execution crashes.*
 
-## Donate
+## Buy me a coffee :)
 
-If this plugin helped you save time or brought value to your projects, consider supporting my work! Your donations will go directly toward upgrading my hardware setup (laptop/PC) so I can keep developing innovative tools.
+If this plugin helped you save time or brought value to your projects, consider supporting my work! Your donations will go directly toward upgrading my hardware setup so I can keep developing innovative tools.
 
-[![Buy Me A Coffee](https://buymeacoffee.com☕&slug=entoknakal&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com)
+<a href="https://buymeacoffee.com/entoknakal" target="_blank"><img src="https://cdn.buymeacoffee.com/" alt="Buy Me A Coffee" style="height: 51px !important;width: auto !important;" >Buy me a coffee</a>
 
 ## License
 
