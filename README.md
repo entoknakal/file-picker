@@ -264,6 +264,7 @@ If this plugin helped you save time or brought value to your projects, consider 
 
 <a href="https://buymeacoffee.com"><img src="https://buymeacoffee.com me a coffee&emoji=☕&slug=entoknakal&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
 
+
 ## License
 
 The MIT License (MIT). Please see the License File for more information.
