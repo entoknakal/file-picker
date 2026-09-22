@@ -22,8 +22,9 @@ object FilePickerFunctions {
     class OpenPicker(private val activity: Activity) : BridgeFunction {
 
         override fun execute(parameters: Map<String, Any>): Map<String, Any> {
-            // 1. Ekstraksi parameter "types" secara fleksibel dan aman
+            // 1. Ekstraksi parameter "types" dan "multiple" (default multiple = false)
             val rawTypes = extractRawTypes(parameters["types"])
+            val isMultiple = extractMultipleParam(parameters["multiple"])
             val types = parseAndNormalizeTypes(rawTypes)
             val rawTypesFormatted = rawTypes.joinToString(", ")
 
@@ -31,7 +32,7 @@ object FilePickerFunctions {
                 ?: throw BridgeError.ExecutionFailed("Activity is not a ComponentActivity")
 
             val latch = CountDownLatch(1)
-            var selectedUri: Uri? = null
+            val selectedUris = mutableListOf<Uri>()
             var errorException: Exception? = null
 
             val finalAllowedTypes = types.toList()
@@ -41,10 +42,14 @@ object FilePickerFunctions {
                     val registryKey = "file_picker_" + System.currentTimeMillis()
                     var launcher: ActivityResultLauncher<Array<String>>? = null
 
-                    val customContract = object : ActivityResultContract<Array<String>, Uri?>() {
+                    // Custom Contract untuk menangani Single dan Multiple File Selection
+                    val customContract = object : ActivityResultContract<Array<String>, List<Uri>>() {
                         override fun createIntent(context: Context, input: Array<String>): Intent {
                             return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                                 addCategory(Intent.CATEGORY_OPENABLE)
+                                if (isMultiple) {
+                                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                                }
                                 val validTypes = input.filter { it.isNotBlank() }
                                 if (validTypes.isNotEmpty() && !validTypes.contains("*/*")) {
                                     type = if (validTypes.size == 1) validTypes.first() else "*/*"
@@ -55,18 +60,30 @@ object FilePickerFunctions {
                             }
                         }
 
-                        override fun parseResult(resultCode: Int, intent: Intent?): Uri? {
-                            return if (intent == null || resultCode != Activity.RESULT_OK) null else intent.data
+                        override fun parseResult(resultCode: Int, intent: Intent?): List<Uri> {
+                            if (intent == null || resultCode != Activity.RESULT_OK) return emptyList()
+
+                            val uris = mutableListOf<Uri>()
+                            val clipData = intent.clipData
+
+                            if (clipData != null) {
+                                for (i in 0 until clipData.itemCount) {
+                                    clipData.getItemAt(i)?.uri?.let { uris.add(it) }
+                                }
+                            } else {
+                                intent.data?.let { uris.add(it) }
+                            }
+                            return uris
                         }
                     }
 
                     launcher = componentActivity.activityResultRegistry.register(
                         registryKey,
                         customContract
-                    ) { uri: Uri? ->
+                    ) { uris: List<Uri> ->
                         try {
-                            if (uri != null) {
-                                selectedUri = uri
+                            if (uris.isNotEmpty()) {
+                                selectedUris.addAll(uris)
                             }
                         } catch (e: Exception) {
                             errorException = e
@@ -85,29 +102,47 @@ object FilePickerFunctions {
 
             latch.await(5, TimeUnit.MINUTES)
 
-            // 1. Tangkap error jika gagal membuka Activity File Picker
             if (errorException != null) {
                 val message = errorException?.message ?: "Gagal membuka file manager"
                 return BridgeResponse.error(BridgeError.ExecutionFailed(message))
             }
 
-            // 2. Pengguna membatalkan pilihan (kembalikan map kosong agar tidak error di PHP)
-            if (selectedUri == null) {
-                return BridgeResponse.success(emptyMap<String, String>())
+            // Pengguna membatalkan pilihan
+            if (selectedUris.isEmpty()) {
+                return if (isMultiple) {
+                    BridgeResponse.success(mapOf("files" to emptyList<Map<String, String>>()))
+                } else {
+                    BridgeResponse.success(emptyMap<String, String>())
+                }
             }
 
-            // 3. Salin & Validasikan file di Background Thread
+            // Salin & Validasikan file di Background Thread
             return try {
-                val resultData = processAndCopyUri(activity, selectedUri!!, finalAllowedTypes, rawTypesFormatted)
-                BridgeResponse.success(resultData)
+                if (isMultiple) {
+                    val resultsList = selectedUris.map { uri ->
+                        processAndCopyUri(activity, uri, finalAllowedTypes, rawTypesFormatted)
+                    }
+                    // Dibungkus ke dalam map "files" agar sesuai dengan BridgeResponse.success(Map<String, Any>)
+                    BridgeResponse.success(mapOf("files" to resultsList))
+                } else {
+                    val singleResult = processAndCopyUri(activity, selectedUris.first(), finalAllowedTypes, rawTypesFormatted)
+                    BridgeResponse.success(singleResult)
+                }
             } catch (e: Exception) {
-                // melempar Exception ke PHP catch (\Throwable $e)
                 val message = e.message ?: "Gagal memproses file"
                 BridgeResponse.error(BridgeError.ExecutionFailed(message))
             }
         }
 
-        // Helper ekstraksi parameter dari Bridge agar tidak pernah jatuh ke empty list
+        private fun extractMultipleParam(param: Any?): Boolean {
+            return when (param) {
+                is Boolean -> param
+                is String -> param.trim().lowercase() == "true" || param.trim() == "1"
+                is Number -> param.toInt() == 1
+                else -> false
+            }
+        }
+
         private fun extractRawTypes(param: Any?): List<String> {
             if (param == null) return listOf("*/*")
             val result = mutableListOf<String>()
@@ -221,14 +256,12 @@ object FilePickerFunctions {
             } catch (_: Exception) {}
 
             val fileLogExt = fileName.substringAfterLast('.', "").lowercase()
-
             var mimeType = contentResolver.getType(uri)
             
             val inferredMime = if (fileLogExt.isNotEmpty()) {
                 MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileLogExt)
             } else null
 
-            // Hanya override jika MimeTypeMap menemukan MIME type resmi
             if (!inferredMime.isNullOrEmpty()) {
                 mimeType = inferredMime
             } else if (mimeType.isNullOrEmpty()) {
@@ -236,7 +269,6 @@ object FilePickerFunctions {
             }
             val finalMimeType = mimeType ?: "application/octet-stream"
 
-            // 4. Validasi Ketat Sisi Kotlin (Kunci Pertahanan Utama)
             if (allowedTypes.isNotEmpty() && !allowedTypes.contains("*/*")) {
                 val isAllowed = allowedTypes.any { allowed ->
                     when {
@@ -246,7 +278,6 @@ object FilePickerFunctions {
                             finalMimeType.startsWith("$prefix/")
                         }
                         else -> {
-                            // Cek kesesuaian MIME Type langsung atau ekstensi file
                             if (allowed.equals(finalMimeType, ignoreCase = true)) {
                                 true
                             } else {
@@ -262,9 +293,8 @@ object FilePickerFunctions {
                     }
                 }
 
-                // Jika file tidak sesuai (misal gambar-1.jpg), LEMPAR EXCEPTION KE PHP!
                 if (!isAllowed) {
-                    throw Exception("File yang dipilih bertipe ($finalMimeType). Harap pilih file dengan format: [$rawTypesFormatted].")
+                    throw Exception("File '$fileName' bertipe ($finalMimeType). Harap pilih file dengan format: [$rawTypesFormatted].")
                 }
             }
 
@@ -275,7 +305,7 @@ object FilePickerFunctions {
                 FileOutputStream(localFile).use { output ->
                     input.copyTo(output)
                 }
-            } ?: throw Exception("Tidak dapat membaca data dari file yang dipilih.")
+            } ?: throw Exception("Tidak dapat membaca data dari file '$fileName'.")
 
             return mapOf(
                 "name" to fileName,

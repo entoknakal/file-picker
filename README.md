@@ -2,6 +2,13 @@
 
 A FilePicker plugin designed for NativePHP Mobile (Android only).
 
+### Features
+
+* **Single & Multiple Selection Support:** Easily toggle between picking a single file or multiple files simultaneously using the multiple parameter.
+* **Flexible File Filtering:** Filter choices using broad aliases (e.g., photos, videos), explicit MIME types (e.g., application/pdf), or specific file extensions.
+* **Asynchronous Copying & Stream Handling:** Moves assets safely from temporary Android cache locations into custom Laravel Storage disks using the FilePickerCopy event.
+* **Robust Error Handling:** Captured Kotlin constraints, access denials, or criteria mismatches are cleanly returned as customizable error exceptions.
+
 ## Dependencies
 
 Before installing, ensure your project meets the following requirements:
@@ -41,7 +48,7 @@ To implement the FilePicker in your NativePHP Mobile application, follow these s
 
 ### 1. Create the NativeComponent Class
 
-Create a new file named `FileSelector.php` inside the `app/NativeComponents` directory:
+Create or update your component file named `PickFile.php` inside the `app/NativeComponents` directory:
 
 ```php
 <?php
@@ -54,140 +61,204 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Native\Mobile\Edge\NativeComponent;
 
-class FileSelector extends NativeComponent
+class PickFile extends NativeComponent
 {
+    public array $allowedTypes = ['application/pdf', 'photos'];
+    
+    // Set to true for multiple selection. Default value is false.
+    public bool $multiple = false; 
+
+    public array $selectedFiles = [];
+
+    // First file metadata shortcuts (for single file compatibility)
     public ?string $filePath = null;
     public ?string $fileName = null;
     public ?string $mimeType = null;
     public ?string $fileSize = null;
-
-    public array $allowedTypes = ['application/pdf', 'photos'];
+    public ?string $extension = null;
+    public ?string $imagesFilePath = null;
 
     public ?string $allowedTypesString = null;
-    public ?string $extension = null;
 
-    public bool $status = true;
+    public ?bool $status = null; // Default state is null
     public ?string $errorMessage = null;
-
-    public ?string $storage_path = null;
-    public ?string $storage_public = null;
-
-    public ?string $imagesFilePath = null;
 
     public function selectFile(): void
     {
         $this->errorMessage = null;
-        $this->status = true;
+        $this->status = null;
+        $this->selectedFiles = [];
 
         try {
-            // Initialize and pass the 'types' criteria to the Kotlin layer
             $fileData = FilePicker::open([
                 'types' => $this->allowedTypes,
+                'multiple' => $this->multiple,
             ]);
 
-            // Handle case where user cancels the file selection UI in Android
             if (empty($fileData)) {
                 return;
             }
 
-            // Capture any explicit errors returned by the Kotlin bridge
             if (isset($fileData['error'])) {
                 $this->status = false;
                 $this->errorMessage = $fileData['error'];
                 return;
             }
 
-            if (!isset($fileData['path'])) {
-                return;
+            // Normalize payload structure
+            if (isset($fileData['files']) && is_array($fileData['files'])) {
+                $items = $fileData['files'];
+            } elseif (isset($fileData) && is_array($fileData)) {
+                $items = $fileData;
+            } else {
+                $items = [$fileData];
             }
 
-            // Instantly dispatch event once the file processing from Kotlin finishes
-            if (!empty($fileData['path']) && file_exists($fileData['path'])) {
-                FilePickerCopy::dispatch(
-                    $fileData['path'],
-                    $fileData['name']
-                );
-            }
-
-            // Map valid payload elements returned from successful Kotlin validation
-            $this->fileName = $fileData['name'] ?? null;
-            $this->extension = strtolower(pathinfo($fileData['path'], PATHINFO_EXTENSION));
-            $this->mimeType = $fileData['mime_type'] ?? null;
-            $this->fileSize = $fileData['size'] ?? null;
+            $disk = Storage::disk('mobile_public');
             $this->allowedTypesString = implode(', ', $this->allowedTypes);
 
-            $this->storage_path = storage_path('');
-            $this->storage_public = Storage::disk('mobile_public')->path('');
+            foreach ($items as $index => $item) {
+                if (empty($item['path']) || !file_exists($item['path'])) {
+                    continue;
+                }
 
-            // Reference the new copied destination within public storage area
-            $newPath = $this->storage_public . 'uploadedFiles/' . $this->fileName;
+                $originalName = $item['name'] ?? ('file_' . time());
+                $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+                $fileName = $baseName . ($ext ? '.' . $ext : '');
 
-            if (file_exists($newPath)) {
-                $this->filePath = $newPath;
-                // Provide physical file path direct to the native:image reader element
-                $this->imagesFilePath = $newPath;
+                // Stream copy from temporary cache
+                FilePickerCopy::dispatch(
+                    $item['path'],
+                    $fileName,
+                    'ztssUpload',
+                    'mobile_public'
+                );
+
+                $relativePath = 'ztssUpload/' . $fileName;
+                $finalPath = $disk->path($relativePath);
+
+                if (!file_exists($finalPath)) {
+                    if (!$disk->exists('ztssUpload')) {
+                        $disk->makeDirectory('ztssUpload');
+                    }
+                    copy($item['path'], $finalPath);
+                    @unlink($item['path']);
+                }
+
+                if (!file_exists($finalPath)) {
+                    continue;
+                }
+
+                $mimeType = $item['mime_type'] ?? null;
+                $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])
+                    || ($mimeType && str_starts_with($mimeType, 'image/'));
+
+                $fileSrc = str_starts_with($finalPath, 'file://') ? $finalPath : 'file://' . $finalPath;
+
+                $this->selectedFiles[] = [
+                    'name' => $fileName,
+                    'path' => $finalPath,
+                    'file_src' => $fileSrc,
+                    'extension' => $ext,
+                    'mime_type' => $mimeType,
+                    'size' => $item['size'] ?? (file_exists($finalPath) ? filesize($finalPath) : 0),
+                    'is_image' => $isImage,
+                ];
+            }
+
+            if (!empty($this->selectedFiles)) {
+                $this->status = true;
+                $first = $this->selectedFiles[0];
+                $this->fileName = $first['name'];
+                $this->filePath = $first['path'];
+                $this->extension = $first['extension'];
+                $this->mimeType = $first['mime_type'];
+                $this->fileSize = (string) $first['size'];
+                $this->imagesFilePath = $first['file_src'];
             } else {
-                $this->filePath = null;
-                $this->imagesFilePath = null;
+                $this->status = false;
+                $this->errorMessage = 'Failed to save files into the ztssUpload directory.';
             }
         } catch (\Throwable $e) {
-            // CATCH KOTLIN CONSTRAINTS AND EXCEPTIONS:
-            // Throws automatically if the user chooses a restricted extension (e.g. PNG/APK)
-            // matching criteria errors originating from 'processAndCopyUri' in Kotlin.
             $this->status = false;
             $this->filePath = null;
+            $this->selectedFiles = [];
             $this->errorMessage = $e->getMessage();
         }
     }
 
     public function render(): View
     {
-        return view('native.file-selector');
+        return view('native.pick-file');
     }
 }
 ```
 
 ### 2. Create the Blade View Template
 
-Create a file named `file-selector.blade.php` inside the `resources/views/native` directory:
+Create or update your template file named `pick-file.blade.php` inside the `resources/views/native` directory:
 
 ```html
 <native:scroll-view fill class="bg-theme-background">
-    <!-- ======================================================= -->
-    <!-- FILE PICKER PLUGIN COMPONENT INTERFACE                  -->
-    <!-- ======================================================= -->
     <column class="gap-2 mt-6 w-full">
-        <text class="text-md font-semibold text-theme-on-background">FilePicker Plugin Tester</text>
+        <text class="text-md font-semibold text-theme-on-background">Penguji Plugin FilePicker</text>
 
-        <!-- Use native:button to trigger the selectFile logic wrapper -->
+        <text class="text-xs text-zinc-500 dark:text-zinc-400">
+            Multiple Mode: {{ $multiple ? 'Enabled (Select Multiple Files)' : 'Disabled (Select Single File)' }}
+        </text>
+
         <native:button label="Open File Manager" variant="secondary" @press="selectFile" />
 
-        <text class="text-md font-semibold text-theme-on-background">Status: {{ \$status }}</text>
+        @if($status !== null)
+            <text class="text-md font-semibold {{ $status ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                Status: {{ $status ? 'Succeed' : 'Failed' }}
+            </text>
+        @endif
 
-         @if(\$status && \$filePath)
-            <vstack class="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-lg mt-2 gap-1 w-full border border-zinc-200">
-                <text class="font-bold text-zinc-900 dark:text-white">Selected File:</text>
-                <text class="text-sm text-zinc-700 dark:text-zinc-300">Allowed Type String: {{ \$allowedTypesString }}</text>
-                <text class="text-sm text-zinc-700 dark:text-zinc-300">Extension: .{{ \$extension }}</text>
-                <text class="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Name: {{ \$fileName }}</text>
-                <text class="text-xs text-zinc-500 dark:text-zinc-400">Path: {{ \$filePath }}</text>
-                <text class="text-xs text-zinc-500 dark:text-zinc-400">Mime Type: {{ \$mimeType }}</text>
-                <text class="text-xs text-zinc-500 dark:text-zinc-400">Size: {{ number_format(\$fileSize / 1024, 2) }} KB</text>
-                <text class="text-xs text-zinc-500 dark:text-zinc-400">Storage path: {{ \$storage_path }}</text>
-                <text class="text-xs text-zinc-500 dark:text-zinc-400">Storage public: {{ \$storage_public }}</text>
+        @if($status === true && !empty($selectedFiles))
+            <vstack class="gap-3 mt-2 w-full">
+                <text class="font-bold text-zinc-900 dark:text-white">
+                    Total Files Selected: {{ count($selectedFiles) }}
+                </text>
 
-                <!-- Conditional Image Preview block container -->
-                @if(in_array(\$extension, ['jpg', 'jpeg', 'png', 'webp', 'gif']))
-                    <column class="gap-1 py-2">
-                        <native:image :src="\$imagesFilePath" :fit="1" class="rounded-xl w-full h-48" />
-                    </column>
-                @endif
-                <text class="text-xs text-zinc-500 dark:text-zinc-400">Image file path: {{ \$imagesFilePath }}</text>
+                @foreach($selectedFiles as $index => $file)
+                    <vstack class="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-lg gap-1 w-full border border-zinc-200 dark:border-zinc-700">
+                        <text class="font-bold text-zinc-900 dark:text-white">
+                            File #{{ $index + 1 }}: {{ $file['name'] }}
+                        </text>
+                        <text class="text-sm text-zinc-700 dark:text-zinc-300">Allowed Formats: {{ $allowedTypesString }}</text>
+                        <text class="text-sm text-zinc-700 dark:text-zinc-300">Extension: .{{ $file['extension'] }}</text>
+                        <text class="text-xs text-zinc-500 dark:text-zinc-400">Path: {{ $file['path'] }}</text>
+                        <text class="text-xs text-zinc-500 dark:text-zinc-400">Mime Type: {{ $file['mime_type'] }}</text>
+                        <text class="text-xs text-zinc-500 dark:text-zinc-400">
+                            Size: {{ number_format($file['size'] / 1024, 2) }} KB
+                        </text>
+
+                        @if($file['is_image'])
+                            <column class="gap-1 py-2">
+                                <native:image :src="$file['file_src']" :fit="1" class="rounded-xl w-full h-48" />
+                            </column>
+                        @endif
+                    </vstack>
+                @endforeach
             </vstack>
         @endif
-    </column>
-</native:scroll-view>
+
+        @if($status === false && $errorMessage)
+            <vstack class="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg mt-2 gap-2 w-full border border-red-200 dark:border-red-900">
+                <hstack class="gap-2 items-center">
+                    <text class="text-md font-bold text-red-600 dark:text-red-400">⚠️ Akses Ditolak / Gagal</text>
+                </hstack>
+
 ```
+
+### Multiple File Selection Configuration
+
+By default, the plugin opens the system file explorer in single-file mode. To enable multiple file selection, configure the $multiple state in your component: 
+
+* **Single Selection (Default):** public bool $multiple = false; (Allows picking only one file).
+* **Multiple Selection:** Set public bool $multiple = true; inside your PickFile component before executing FilePicker::open().
 
 ### 3. File Processing & Asynchronous Copy via `FilePickerCopy`
 
@@ -200,10 +271,10 @@ By default, triggering `FilePickerCopy::dispatch($path, $name)` moves your asset
 use entoknakal\FilePicker\Events\FilePickerCopy;
 
 FilePickerCopy::dispatch(
-    sourcePath: $fileData['path'],       // Absolute Android system cache temporary path
-    originalName: $fileData['name'],     // Desired target filename (e.g., "document.pdf")
-    targetFolder: 'myCustomFolder',      // Subfolder directory name (defaults to 'ztssUpload')
-    disk: 'local'                        // Configured Laravel Storage Disk name (defaults to 'mobile_public')
+    sourcePath: $item['path'],       // Absolute Android system cache temporary path
+    originalName: $fileName,         // Desired target filename (e.g., "document.pdf")
+    targetFolder: 'ztssUpload',      // Subfolder directory name
+    disk: 'mobile_public'            // Configured Laravel Storage Disk name
 );
 ```
 
@@ -248,21 +319,15 @@ The following table outlines how built-in string values are normalized and trans
 | `videos`, `video`, `movie`, `movies` | `video/*` |
 | `audios`, `audio`, `sound`, `sounds`, `music` | `audio/*` |
 | `pdf` | `application/pdf` |
-| `zip` | `application/zip`, `application/x-zip-compressed` |
-| `rar` | `application/vnd.rar`, `application/x-rar-compressed` |
-| `word`, `doc`, `docx` | `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
-| `excel`, `xls`, `xlsx` | `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
-| `ppt`, `pptx`, `powerpoint` | `application/vnd.ms-powerpoint`, `application/vnd.openxmlformats-officedocument.presentationml.presentation` |
+| `zip` | `application/zip`, <br>`application/x-zip-compressed` |
+| `rar` | `application/vnd.rar`, <br>`application/x-rar-compressed` |
+| `word`, `doc`, `docx` | `application/msword`, <br>`application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
+| `excel`, `xls`, `xlsx` | `application/vnd.ms-excel`, <br>`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
+| `ppt`, `pptx`, `powerpoint` | `application/vnd.ms-powerpoint`, <br>`application/vnd.openxmlformats-officedocument.presentationml.presentation` |
 | `txt`, `text` | `text/plain` |
 | `csv` | `text/csv` |
 
 *Note: If a custom standalone extension or unrecognized MIME string is processed and cannot be resolved by the device's standard `MimeTypeMap` registry, the Kotlin backend gracefully defaults to `application/octet-stream` or `application/$ext` to prevent execution crashes.*
-
-## Buy me a coffee :)
-
-If this plugin helped you save time or brought value to your projects, consider supporting my work! Your donations will go directly toward upgrading my hardware setup so I can keep developing innovative tools.
-
-<a href="https://buymeacoffee.com/entoknakal" target="_blank"><img src="https://cdn.buymeacoffee.com/" alt="Buy Me A Coffee" style="height: 51px !important;width: auto !important;" >Buy me a coffee</a>
 
 ## License
 
